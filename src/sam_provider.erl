@@ -10,7 +10,7 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(sam_handler).
+-module(sam_provider).
 
 -export([
     start/1
@@ -24,7 +24,3 @@
 start(Msg) ->
     {ok, proc_lib:spawn(?MODULE, run, [Msg])}.
 
-
-run(Msg) ->
-    ok.    
-    

@@ -29,7 +29,11 @@
 start_link() ->
     proc_lib:start_link(?MODULE, init, []).
 
-send(Data) ->
+send(#{type := _} = Msg) ->
+    Body = sam_msg:to_json(Msg),
+    CL = size(Body),
+    send(io_lib:format("Content-Length: ~b\r\n\r\n~s", [CL, Body]));
+send(Data) when is_binary(Data); is_list(Data) ->
     {ok, IoDevice} = application:get_env(sam, stdio),
     io:format(IoDevice, "~s", Data).
 
@@ -44,8 +48,8 @@ loop(IoDevice, BinHeaders) ->
         <<"\n">> ->
             Headers = parse_headers(BinHeaders),
             Length = content_length(Headers),
-            Request = read_request(IoDevice, Length),
-            sam_server:handle_request(Request),
+            Body = read_body(IoDevice, Length),
+            sam_server:handle(Body),
             ?MODULE:loop(IoDevice, []);
         eof ->
             sam:exit();
@@ -64,6 +68,6 @@ content_length(Headers) ->
     {?CONTENT_LENGTH, Length} = lists:keyfind(?CONTENT_LENGTH, 1, Headers),
     binary_to_integer(Length).
 
-read_request(IoDevice, Length) ->
+read_body(IoDevice, Length) ->
     {ok, Body} = file:read(IoDevice, Length),
     jsx:decode(Body, [return_maps]).

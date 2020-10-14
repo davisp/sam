@@ -15,7 +15,7 @@
 
 -export([
     start_link/0,
-    handle_request/1,
+    handle/1,
     respond/1
 ]).
 
@@ -30,6 +30,8 @@
 ]).
 
 
+-define(PROCS, sam_server_processes).
+
 -record(st, {
     request_id = 0
 }).
@@ -39,12 +41,19 @@ start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
 
-handle_request(Request) ->
-    gen_server:cast(?MODULE, {handle_request, Request}).
+handle(Body) ->
+    gen_server:cast(?MODULE, {handle, Body}).
+
+
+send(_) ->
+    ok.
+
+respond(_) ->
+    ok.
 
 
 init(_) ->
-    ets:new(?MODULE, [set, named_table]),
+    ets:new(?PROCS, [set, named_table]),
     {ok, #st{}}.
 
 
@@ -56,40 +65,56 @@ handle_call(Msg, _From, St) ->
     {stop, {bad_call, Msg}, {bad_call, Msg}, St}.
 
 
-handle_cast({handle_request, JSONRequest}, St) ->
-    case sam_msg:from_json(JSONRequest) of
-        {ok, Msg} ->
-            start_handler(Msg);
-        {error, Error} ->
-            respond(sam_msg:error(Error))
-    end,
-    {noreply, St};
+handle_cast({handle, Body}, St) ->
+    try
+        Msg = sam_msg:from_json(Body),
+        case Msg of
+            #{type := request} -> handle_request(Msg);
+            #{type := response} -> handle_response(Msg);
+            #{type := cancel} -> cancel_request(Msg);
+            #{type := progress} -> handle_progress(Msg)
+        end,
+        {noreply, St}
+    catch T:R:S ->
+        lager:error("Error handling ~p :: ~p ~p ~p", [Body, T, R, S]),
+        {stop, {bad_msg, Body}, St}
+    end;
 handle_cast(Msg, St) ->
     {stop, {bad_cast, Msg}, St}.
 
 
 handle_info({'DOWN', Ref, process, Pid, Reason}, St) ->
-    case ets:lookup(?MODULE, Ref) of
+    case ets:lookup(?PROCS, Ref) of
         [] when Reason == normal ->
-            % Process responded and left this world peacefully
+            % Process has left this world peacefully
             ok;
         [] ->
-            % Bad process exit after responding?
-            lager:warn("Request handler died abnormally: ~p", [Reason]);        
-        [{Ref, Pid, _ReqId}] ->
-            
+            % Unknown process exit?
+            lager:error("Unknown process ~p died: ~p", [Pid, Reason]);
+        [{Ref, Pid, ReqId}] ->
+            ets:delete(?PROCS, Ref),
+            lager:error("Error handling request ~p: ~p", [Pid, Reason]);
+            Msg = sam_msg:error(ReqId, ?JSONRPC_INTERNAL_ERROR, process_died),
+            sam_stdio:send(Msg)
     end,
     {noreply, St};            
 handle_info(Msg, St) ->
     {stop, {bad_info, Msg}, St}.
 
-
 code_change(_OldVsn, St, _Extra) ->
     {ok, St}.
 
-
-start_handler(Msg) ->
-    ReqId = maps:get(req_id, Msg, undefined),
+handle_request(#{req_id := ReqId} = Request) ->
     {ok, Pid} = sam_handler:start(Request),
     Ref = erlang:monitor(process, Pid),
-    ets:insert(?MODULE, {Ref, Pid, ReqId}).
+    ets:insert(?PROCS, {Ref, Pid, ReqId}).
+
+handle_response(#{req_id := ReqId} = Response) ->
+    erlang:error(not_implemented).
+
+handle_cancel(#{}) ->
+    % not implemented
+    ok.
+
+handle_progress(#{}) ->
+    erlang:error(not_implemented).
