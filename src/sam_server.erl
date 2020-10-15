@@ -16,9 +16,9 @@
 -export([
     start_link/0,
     handle/1,
+    send/1,
     respond/1
 ]).
-
 
 -export([
     init/1,
@@ -29,6 +29,7 @@
     code_change/3
 ]).
 
+-include("sam.hrl").
 
 -define(PROCS, sam_server_processes).
 
@@ -93,7 +94,7 @@ handle_info({'DOWN', Ref, process, Pid, Reason}, St) ->
             lager:error("Unknown process ~p died: ~p", [Pid, Reason]);
         [{Ref, Pid, ReqId}] ->
             ets:delete(?PROCS, Ref),
-            lager:error("Error handling request ~p: ~p", [Pid, Reason]);
+            lager:error("Error handling request ~p: ~p", [Pid, Reason]),
             Msg = sam_msg:error(ReqId, ?JSONRPC_INTERNAL_ERROR, process_died),
             sam_stdio:send(Msg)
     end,
@@ -109,10 +110,10 @@ handle_request(#{req_id := ReqId} = Request) ->
     Ref = erlang:monitor(process, Pid),
     ets:insert(?PROCS, {Ref, Pid, ReqId}).
 
-handle_response(#{req_id := ReqId} = Response) ->
+handle_response(#{}) ->
     erlang:error(not_implemented).
 
-handle_cancel(#{}) ->
+cancel_request(#{}) ->
     % not implemented
     ok.
 

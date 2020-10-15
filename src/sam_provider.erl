@@ -16,10 +16,7 @@
     start/1
 ]).
 
--export([
-    run/1
-]).
-
+-callback run(any()) -> any().
 
 start(Msg) ->
     {ok, proc_lib:spawn(?MODULE, run, [Msg])}.
