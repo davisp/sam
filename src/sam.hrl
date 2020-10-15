@@ -23,4 +23,6 @@
 -define(JSONRPC_CONTENT_MODIFIED, -32801).
 
 
--define(JSONRPC_ERROR(Code, Mesg), throw({jsonrpc_error, Code, Msg})).
+-define(LSP_TEXT_DOCUMENT_SYNC_KIND_NONE, 0).
+-define(LSP_TEXT_DOCUMENT_SYNC_KIND_FULL, 1).
+-define(LSP_TEXT_DOCUMENT_SYNC_KIND_INCREMENTAL, 2).

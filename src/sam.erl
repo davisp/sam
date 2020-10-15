@@ -17,7 +17,7 @@
 ]).
 
 -export([
-    exit/0
+    exit/1
 ]).
 
 main(Opts) ->
@@ -32,15 +32,15 @@ main(Opts) ->
     application:set_env(sam, root_pid, self()),
     lager:debug("ENV: ~p", [application:get_all_env(sam)]),
     receive
-        exit -> ok;
+        {exit, Code} -> erlang:halt(Code);
         Else -> erlang:error({bad_shutdown, Else})
     end.
 
 
-exit() ->
+exit(Code) ->
     lager:debug("EXIT: ~p", [application:get_all_env(sam)]),
     {ok, RootPid} = application:get_env(sam, root_pid),
-    RootPid ! exit.
+    RootPid ! {exit, Code}.
 
 
 parse_opts(Opts) ->

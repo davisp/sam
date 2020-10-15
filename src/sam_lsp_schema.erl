@@ -14,6 +14,11 @@
 
 
 -export([
+    client_initiated/0,
+    server_initiated/0,
+    message_type/1,
+    response_type/1,
+
     cancel_notification/0,
     progress_notification/0,
 
@@ -23,7 +28,6 @@
 
     initialize_request/0,
     initialize_response/0,
-    initialize_error/0,
 
     initialized_notification/0,
 
@@ -35,7 +39,7 @@
     show_message_notification/0,
 
     show_message_request/0,
-    show_message_request_response/0,
+    show_message_response/0,
 
     log_message_notification/0,
 
@@ -84,7 +88,7 @@
 
     did_save_text_document_notification/0,
 
-    did_close_tet_document_notification/0,
+    did_close_text_document_notification/0,
 
     publish_diagnostics_notification/0,
 
@@ -106,7 +110,7 @@
     definition_request/0,
     definition_response/0,
 
-    type_defintion_request/0,
+    type_definition_request/0,
     type_definition_response/0,
 
     implementation_request/0,
@@ -165,6 +169,232 @@
 ]).
 
 
+client_initiated() ->
+    [
+        cancel_notification,
+        progress_notification,
+        
+        work_done_progress_begin_notification,
+        work_done_progress_report_notification,
+        work_done_progress_end_notification,
+        
+        initialize_request,
+        initialized_notification,
+        shutdown_request,  
+        exit_notification,
+
+        show_message_response,
+
+        work_done_progress_create_response,
+        work_done_progress_cancel_notification,
+
+        register_capability_response,
+        unregister_capability_response,
+        
+        workspace_folders_response,
+        
+        did_change_workspace_folders_notification,
+        did_change_configuration_notification,
+        
+        configuration_response,
+        
+        did_change_watched_files_notification,
+        
+        workspace_symbol_request,
+        
+        execute_command_request,
+        
+        apply_workspace_edit_response,
+        
+        did_open_text_document_notification,
+        did_change_text_document_notification,
+        
+        will_save_text_document_notification,
+        
+        will_save_wait_until_text_document_request,
+        
+        did_save_text_document_notification,
+        did_close_text_document_notification,
+        
+        completion_request,
+        completion_item_resolve_request,
+        hover_request,
+        signature_help_request,
+        declaration_request,
+        definition_request,
+        type_definition_request,
+        implementation_request,
+        reference_request,
+        document_highlight_request,
+        document_symbol_request,
+        code_action_request,
+        code_lens_request,
+        code_lens_resolve_request,
+        document_link_request,
+        document_link_resolve_request,
+        document_color_request,
+        color_presentation_request,
+        document_formatting_request,
+        document_range_formatting_request,
+        document_on_type_formatting_request,
+        rename_request,
+        prepare_rename_request,
+        folding_range_request,
+        selection_range_request
+    ].
+
+server_initiated() ->
+    [
+        work_done_progress_report_notification,
+        work_done_progress_end_notification,
+
+        initialize_response,
+
+        shutdown_response,
+        
+        show_message_notification,
+        show_message_request,
+        
+        log_message_notification,
+
+        work_done_progress_create_request,
+
+        telemetry_notification,
+
+        register_capability_request,
+        unregister_capability_request,
+
+        workspace_folders_request,
+        
+        configuration_request,
+        
+        workspace_symbol_response,
+        
+        execute_command_response,
+        
+        apply_workspace_edit_request,
+        
+        will_save_wait_until_text_document_response,
+
+        publish_diagnostics_notification,
+        
+        completion_response,
+        completion_item_resolve_response,
+        hover_response,
+        signature_help_response,
+        declaration_response,
+        definition_response,
+        type_definition_response,
+        implementation_response,
+        reference_response,
+        document_highlight_response,
+        document_symbol_response,
+        code_action_response,
+        code_lens_response,
+        code_lens_resolve_response,
+        document_link_response,
+        document_link_resolve_response,
+        document_color_response,
+        color_presentation_response,
+        document_formatting_response,
+        document_range_formatting_response,
+        document_on_type_formatting_response,
+        rename_response,
+        prepare_rename_response,
+        folding_range_response,
+        selection_range_response
+    ].
+
+message_type(Body) ->
+    case maps:get(<<"id">>, Body, undefined) of
+        undefined ->
+            notification;
+        _Id ->
+            case maps:get(<<"method">>, Body, undefined) of
+                undefined ->
+                    response;
+                _Method ->
+                    request
+            end
+    end.
+
+response_type(initialize_request) ->
+    initialize_response;
+response_type(shutdown_request) ->
+    shutdown_response;
+response_type(show_message_request) ->
+    show_message_response;
+response_type(work_done_progress_create_request) ->
+    work_done_progress_create_response;
+response_type(register_capability_request) ->
+    register_capability_response;
+response_type(unregister_capability_request) ->
+    unregister_capability_response;
+response_type(workspace_folders_request) ->
+    workspace_folders_response;
+response_type(configuration_request) ->
+    configuration_response;
+response_type(workspace_symbol_request) ->
+    workspace_symbol_response;
+response_type(apply_workspace_edit_request) ->
+    apply_workspace_edit_response;
+response_type(execute_command_request) ->
+    execute_command_response;
+response_type(will_save_wait_until_text_document_request) ->
+    will_save_wait_until_text_document_response;
+response_type(completion_request) ->
+    completion_response;
+response_type(completion_item_resolve_request) ->
+    completion_item_resolve_response;
+response_type(hover_request) ->
+    hover_response;
+response_type(signature_help_request) ->
+    signature_help_response;
+response_type(declaration_request) ->
+    declaration_response;
+response_type(definition_request) ->
+    definition_response;
+response_type(type_definition_request) ->
+    type_definition_response;
+response_type(implementation_request) ->
+    implementation_response;
+response_type(reference_request) ->
+    reference_response;
+response_type(document_highlight_request) ->
+    document_highlight_response;
+response_type(document_symbol_request) ->
+    document_symbol_response;
+response_type(code_action_request) ->
+    code_action_response;
+response_type(code_lens_request) ->
+    code_lens_response;
+response_type(code_lens_resolve_request) ->
+    code_lens_resolve_response;
+response_type(document_link_request) ->
+    document_link_response;
+response_type(document_link_resolve_request) ->
+    document_link_resolve_response;
+response_type(document_color_request) ->
+    document_color_response;
+response_type(color_presentation_request) ->
+    color_presentation_response;
+response_type(document_formatting_request) ->
+    document_formatting_response;
+response_type(document_range_formatting_request) ->
+    document_range_formatting_response;
+response_type(document_on_type_formatting_request) ->
+    document_on_type_formatting_response;
+response_type(rename_request) ->
+    rename_response;
+response_type(prepare_rename_request) ->
+    prepare_rename_response;
+response_type(folding_range_request) ->
+    folding_range_response;
+response_type(selection_range_request) ->
+    selection_range_response;
+response_type(_) ->
+    undefined.
+
 opt(Type) ->
     {optional, Type}.
 
@@ -178,7 +408,7 @@ float_range(Low, High) ->
     {float_range, Low, High}.
 
 message() ->
-    #{jsonprc => string}.
+    #{jsonrpc => string}.
 
 request_message() ->
     Base = message(),
@@ -543,9 +773,19 @@ client_capabilities() ->
 
 initialize_response() ->
     Base = response_message(),
-    Base#{
+    Success = maps:remove(error, Base#{
         result => initialize_result()
-    }.
+    }),
+    Error = maps:remove(result, Base#{
+        error => #{
+            code => 1,
+            message => <<"unknown protocol version">>,
+            data => #{
+                retry => boolean
+            }
+        }
+    }),
+    [Success, Error].
 
 initialize_result() ->
     #{
@@ -556,43 +796,31 @@ initialize_result() ->
         })
     }.
 
-initialize_error() ->
-    Base = response_message(),
-    Base#{
-        error => #{
-            code => 1,
-            message => <<"unknown protocol version">>,
-            data => #{
-                retry => boolean
-            }
-        }
-    }.
-
 server_capabilities() ->
     #{
-        textDocumentSync => opt([text_document_sync_options(), number]),
+        textDocumentSync => opt([text_document_sync_options()]),
         completionProvider => opt(completion_options()),
-        hoverProvider => opt([boolean | hover_options()]),
+        hoverProvider => opt([boolean, hover_options()]),
         signatureHelpProvider => opt(signature_help_options()),
-        declarationProvider => opt([boolean, declaration_options(), declaration_registration_options()]),
+        declarationProvider => opt([boolean, declaration_options()]),
         definitionProvider => opt([boolean, definition_options()]),
-        typeDefinitionProvider => opt([boolean, type_definition_options(), type_definition_registration_options()]),
-        implementationProvider => opt([boolean, implementation_options(), implementation_registration_options()]),
+        typeDefinitionProvider => opt([boolean, type_definition_options()]),
+        implementationProvider => opt([boolean, implementation_options()]),
         referencesProvider => opt([boolean, reference_options()]),
         documentHighlightProvider => opt([boolean, document_highlight_options()]),
         documentSymbolProvider => opt([boolean, document_symbol_options()]),
         codeActionProvider => opt([boolean, code_action_options()]),
         codeLensProvider => opt(code_lens_options()),
         documentLinkProvider => opt(document_link_options()),
-        colorProvider => opt([boolean, document_color_options(), document_color_registration_options()]),
+        colorProvider => opt([boolean, document_color_options()]),
         documentFormattingProvider => opt([boolean, document_formatting_options()]),
         documentRangeFormattingProvider => opt([boolean, document_range_formatting_options()]),
         documentOnTypeFormattingProvider => opt(document_on_type_formatting_options()),
         renameProvider => opt([boolean, rename_options()]),
-        foldingRangeProvider => opt([boolean, folding_range_options(), folding_range_registration_options()]),
+        foldingRangeProvider => opt([boolean, folding_range_options()]),
         executeCommandProvider => opt(execute_command_options()),
-        selectionRangeProvider => opt([boolean, selection_range_options(), selection_range_registration_options()]),
-        workspaceSymbolProvider => opt(boolean),
+        selectionRangeProvider => opt([boolean, selection_range_options()]),
+        workspaceSymbolProvider => opt([boolean, workspace_symbol_options()]),
         workspace => opt(#{
             workspaceFolders => opt(workspace_folders_server_capabilities())
         }),
@@ -659,7 +887,7 @@ message_action_item() ->
         title => string
     }.
 
-show_message_request_response() ->
+show_message_response() ->
     Base = response_message(),
     Base#{
         result => [message_action_item(), null]
@@ -723,7 +951,34 @@ registration() ->
     #{
         id => string,
         method => string,
-        registrationOptions => any
+        registrationOptions => [
+            text_document_registration_options(),
+            did_change_watched_files_registration_options(),
+            workspace_symbol_registration_options(),
+            execute_command_registration_options(),
+            text_document_change_registration_options(),
+            text_document_save_registration_options(),
+            completion_registration_options(),
+            hover_registration_options(),
+            signature_help_registration_options(),
+            declaration_registration_options(),
+            definition_registration_options(),
+            type_definition_registration_options(),
+            implementation_registration_options(),
+            reference_registration_options(),
+            document_highlight_registration_options(),
+            document_symbol_registration_options(),
+            code_action_registration_options(),
+            code_lens_registration_options(),
+            document_link_registration_options(),
+            document_color_registration_options(),
+            document_formatting_registration_options(),
+            document_range_formatting_registration_options(),
+            document_on_type_formatting_registration_options(),
+            rename_registration_options(),
+            folding_range_registration_options(),
+            selection_range_registration_options()
+        ]
     }.
 
 registration_params() ->
@@ -937,7 +1192,7 @@ execute_command_params() ->
     Base = work_done_progress_params(),
     Base#{
         command => string,
-        arguments => opt(list)
+        arguments => opt(array)
     }.
 
 execute_command_response() ->
@@ -974,7 +1229,10 @@ text_document_sync_kind() ->
 text_document_sync_options() ->
     #{
         openClose => opt(boolean),
-        change => opt(text_document_sync_kind())
+        change => opt(text_document_sync_kind()),
+        willSave => opt(boolean),
+        willSaveWaitUntil => opt(boolean),
+        save => opt([boolean, save_options()])
     }.
 
 did_open_text_document_notification() ->
@@ -1072,7 +1330,7 @@ did_save_text_document_params() ->
         text => opt(string)
     }.
 
-did_close_tet_document_notification() ->
+did_close_text_document_notification() ->
     Base = notification_message(),
     Base#{
         method => <<"textDocument/didClose">>,
@@ -1095,9 +1353,9 @@ text_document_sync_client_capabilities() ->
 publish_diagnostics_client_capabilities() ->
     #{
         relatedInformation => opt(boolean),
-        tagSupport => #{
+        tagSupport => opt(#{
             valueSet => array(diagnostic_tag())
-        },
+        }),
         versionSupoprt => opt(boolean)
     }.
 
@@ -1366,7 +1624,7 @@ signature_information() ->
 parameter_information() ->
     #{
         label => [string, sized_array(2, number)],
-        documentation => opt([string, markup_content])
+        documentation => opt([string, markup_content()])
     }.
 
 declaration_client_capabilities() ->
@@ -1451,7 +1709,7 @@ type_definition_registration_options() ->
     Base3 = static_registration_options(),
     maps:merge(Base1, maps:merge(Base2, Base3)).
 
-type_defintion_request() ->
+type_definition_request() ->
     Base = request_message(),
     Base#{
         method => <<"textDocument/typeDefinition">>,
@@ -1654,15 +1912,15 @@ symbol_kind() ->
     ].
 
 document_symbol() ->
-    #{
+    {recursive, #{
         name => string,
         detail => opt(string),
         kind => symbol_kind(),
         deprecated => opt(boolean),
         range => range(),
         selectionRange => range(),
-        children => opt(array(document_symbol()))
-    }.
+        children => opt(array(recurse))
+    }}.
 
 symbol_information() ->
     #{

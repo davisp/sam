@@ -33,6 +33,7 @@ init([]) ->
         period => 60
     },
     Children = [
+        #{id => sam_client, start => {sam_client, start_link, []}},
         #{id => sam_server, start => {sam_server, start_link, []}},
         #{id => sam_stdio, start => {sam_stdio, start_link, []}}
     ],

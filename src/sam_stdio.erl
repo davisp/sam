@@ -13,8 +13,7 @@
 -module(sam_stdio).
 
 -export([
-    start_link/0,
-    send/1
+    start_link/0
 ]).
 
 -export([
@@ -29,14 +28,6 @@
 start_link() ->
     proc_lib:start_link(?MODULE, init, []).
 
-send(#{type := _} = Msg) ->
-    Body = sam_msg:to_json(Msg),
-    CL = size(Body),
-    send(io_lib:format("Content-Length: ~b\r\n\r\n~s", [CL, Body]));
-send(Data) when is_binary(Data); is_list(Data) ->
-    {ok, IoDevice} = application:get_env(sam, stdio),
-    io:format(IoDevice, "~s", Data).
-
 init() ->
     {ok, IoDevice} = application:get_env(sam, stdio),
     ok = io:setopts(IoDevice, [binary]),
@@ -49,10 +40,10 @@ loop(IoDevice, BinHeaders) ->
             Headers = parse_headers(BinHeaders),
             Length = content_length(Headers),
             Body = read_body(IoDevice, Length),
-            sam_server:handle(Body),
+            dispatch(Body),
             ?MODULE:loop(IoDevice, []);
         eof ->
-            sam:exit();
+            sam:exit(0);
         Line ->
             ?MODULE:loop(IoDevice, [Line | BinHeaders])
     end.
@@ -71,3 +62,12 @@ content_length(Headers) ->
 read_body(IoDevice, Length) ->
     {ok, Body} = file:read(IoDevice, Length),
     jsx:decode(Body, [return_maps]).
+
+dispatch(Body) ->
+    %lager:debug("STDIN: ~p", [Body]),
+    case sam_lsp_schema:message_type(Body) of
+        notification -> sam_server:handle_notification(Body);
+        request -> sam_server:handle_request(Body);
+        response -> sam_client:handle_response(Body)
+    end.
+

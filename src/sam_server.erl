@@ -15,9 +15,9 @@
 
 -export([
     start_link/0,
-    handle/1,
-    send/1,
-    respond/1
+
+    handle_notification/1,
+    handle_request/1
 ]).
 
 -export([
@@ -34,28 +34,32 @@
 -define(PROCS, sam_server_processes).
 
 -record(st, {
-    request_id = 0
+    methods
 }).
 
 
 start_link() ->
     gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
+handle_notification(Body) ->
+    gen_server:cast(?MODULE, {notification, Body}).
 
-handle(Body) ->
-    gen_server:cast(?MODULE, {handle, Body}).
-
-
-send(_) ->
-    ok.
-
-respond(_) ->
-    ok.
-
+handle_request(Body) ->
+    gen_server:cast(?MODULE, {request, Body}).
 
 init(_) ->
     ets:new(?PROCS, [set, named_table]),
-    {ok, #st{}}.
+    Types = sam_lsp_schema:client_initiated(),
+    Methods = lists:foldl(fun(TypeName, Acc) ->
+        Type = sam_lsp_schema:TypeName(),
+        case maps:get(method, Type, undefined) of
+            undefined ->
+                Acc;
+            Method ->
+                maps:put(Method, TypeName, Acc)
+        end
+    end, #{}, Types),
+    {ok, #st{methods = Methods}}.
 
 
 terminate(_, _) ->
@@ -66,37 +70,60 @@ handle_call(Msg, _From, St) ->
     {stop, {bad_call, Msg}, {bad_call, Msg}, St}.
 
 
-handle_cast({handle, Body}, St) ->
-    try
-        Msg = sam_msg:from_json(Body),
-        case Msg of
-            #{type := request} -> handle_request(Msg);
-            #{type := response} -> handle_response(Msg);
-            #{type := cancel} -> cancel_request(Msg);
-            #{type := progress} -> handle_progress(Msg)
-        end,
-        {noreply, St}
-    catch T:R:S ->
-        lager:error("Error handling ~p :: ~p ~p ~p", [Body, T, R, S]),
-        {stop, {bad_msg, Body}, St}
+handle_cast({notification, Body}, #st{methods = Methods} = St) ->
+    Method = maps:get(<<"method">>, Body, undefined),
+    case maps:get(Method, Methods) of
+        undefined ->
+            lager:warning("Unknown notification: ~p", [Body]),
+            {noreply, St};
+        TypeName ->
+            case sam_lsp_schema:response_type(TypeName) of
+                undefined ->
+                    sam_provider:notify(TypeName, Body),
+                    {noreply, St};
+                _ResponseType ->
+                    lager:error("Invalid request: ~p", [Body]),
+                    % JSONRPC requires a response for every request
+                    % but we haven't got one for this request so all
+                    % we can do is die to express our dissatisfaction.
+                    sam:exit(1)
+            end
     end;
+handle_cast({request, Body}, #st{methods = Methods} = St) ->
+    Method = maps:get(<<"method">>, Body, undefined),
+    case maps:get(Method, Methods, undefined) of
+        undefined ->
+            lager:warning("Unknown method: ~p", [Body]),
+            sam_client:error(Body, ?JSONRPC_METHOD_NOT_FOUND, unknown_method);
+        ReqTypeName ->
+            case sam_lsp_schema:response_type(ReqTypeName) of
+                undefined ->
+                    lager:error("Invalid request type: ~s", [ReqTypeName]),
+                    sam_client:error(Body, ?JSONRPC_INVALID_REQUEST, invalid_request_type);
+                RespTypeName ->
+                    ReqId = maps:get(<<"id">>, Body),
+                    {ok, Pid} = sam_provider:request(ReqTypeName, RespTypeName, Body),
+                    Ref = erlang:monitor(process, Pid),
+                    ets:insert(?PROCS, {Ref, Pid, ReqId})
+            end
+    end,
+    {noreply, St};
 handle_cast(Msg, St) ->
     {stop, {bad_cast, Msg}, St}.
 
 
 handle_info({'DOWN', Ref, process, Pid, Reason}, St) ->
     case ets:lookup(?PROCS, Ref) of
-        [] when Reason == normal ->
+        [{Ref, Pid, _ReqId}] when Reason == normal ->
             % Process has left this world peacefully
-            ok;
-        [] ->
-            % Unknown process exit?
-            lager:error("Unknown process ~p died: ~p", [Pid, Reason]);
+            ets:delete(?PROCS, Ref);
         [{Ref, Pid, ReqId}] ->
             ets:delete(?PROCS, Ref),
             lager:error("Error handling request ~p: ~p", [Pid, Reason]),
-            Msg = sam_msg:error(ReqId, ?JSONRPC_INTERNAL_ERROR, process_died),
-            sam_stdio:send(Msg)
+            sam_client:error(ReqId, ?JSONRPC_INTERNAL_ERROR, process_died);
+        [] ->
+            % Unknown process exit?
+            lager:error("Unknown process ~p died: ~p", [Pid, Reason])
     end,
     {noreply, St};            
 handle_info(Msg, St) ->
@@ -104,18 +131,3 @@ handle_info(Msg, St) ->
 
 code_change(_OldVsn, St, _Extra) ->
     {ok, St}.
-
-handle_request(#{req_id := ReqId} = Request) ->
-    {ok, Pid} = sam_handler:start(Request),
-    Ref = erlang:monitor(process, Pid),
-    ets:insert(?PROCS, {Ref, Pid, ReqId}).
-
-handle_response(#{}) ->
-    erlang:error(not_implemented).
-
-cancel_request(#{}) ->
-    % not implemented
-    ok.
-
-handle_progress(#{}) ->
-    erlang:error(not_implemented).

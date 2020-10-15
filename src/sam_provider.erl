@@ -13,11 +13,82 @@
 -module(sam_provider).
 
 -export([
-    start/1
+    notify/2,
+    request/3,
+
+    response/2
 ]).
+
+-export([
+    do_notify/2,
+    do_request/3
+]).
+
+-include("sam.hrl").
 
 -callback run(any()) -> any().
 
-start(Msg) ->
-    {ok, proc_lib:spawn(?MODULE, run, [Msg])}.
+notify(NotifyType, Msg) ->
+    {ok, proc_lib:spawn(?MODULE, do_notify, [NotifyType, Msg])}.
 
+request(ReqType, RespTypeName, Msg) ->
+    {ok, proc_lib:spawn(?MODULE, do_request, [ReqType, RespTypeName, Msg])}.
+
+response(Msg, Result) ->
+    #{
+        <<"jsonrpc">> => <<"2.0">>,
+        <<"id">> => maps:get(<<"id">>, Msg),
+        <<"result">> => Result
+    }.
+
+do_notify(TypeName, Msg) ->
+    try
+        sam_lsp_validator:validate(sam_lsp_schema:TypeName(), Msg)
+    catch T1:R1 ->
+        lager:error("Invalid notification: ~p ~p", [{T1, R1}, Msg]),
+        exit(normal)
+    end,
+    try
+        Provider = notification_provider(maps:get(<<"method">>, Msg)),
+        Provider:handle(Msg)
+    catch T2:R2:S2 ->
+        lager:error("Error handling notification: ~p :: ~p ~p", [Msg, {T2, R2}, S2])
+    end.
+    
+
+do_request(ReqTypeName, RespTypeName, Msg) ->
+    try
+        sam_lsp_validator:validate(sam_lsp_schema:ReqTypeName(), Msg)
+    catch T1:R1 ->
+        lager:error("Invalid request: ~p - ~p", [{T1, R1}, Msg]),
+        sam_client:error(Msg, ?JSONRPC_INVALID_REQUEST, schema_validation_failed),
+        exit(normal)
+    end,
+    Resp = try
+        Provider = request_provider(maps:get(<<"method">>, Msg)),
+        Provider:handle(Msg)
+    catch T2:R2:S2 ->
+        lager:error("Error handling message: ~p :: ~p ~p", [Msg, {T2, R2}, S2]),
+        sam_client:error(Msg, ?JSONRPC_INTERNAL_ERROR, unknown_error),
+        exit(normal)
+    end,
+    try
+        sam_client:reply(RespTypeName, Resp)
+    catch error:{match_failed, _, _}=R3:S3 ->
+        lager:error("Invalid response: ~p :: ~p ~p", [Resp, R3, S3]),
+        sam_client:error(Msg, ?JSONRPC_INTERNAL_ERROR, invalid_response)
+    end.
+
+notification_provider(<<"exit">>) ->
+    sam_provider_notify_exit;
+notification_provider(<<"initialized">>) ->
+    sam_provider_notify_initialized;
+notification_provider(_) ->
+    sam_provider_notify_unknown.
+
+request_provider(<<"initialize">>) ->
+    sam_provider_request_initialize;
+request_provider(<<"shutdown">>) ->
+    sam_provider_request_shutdown;
+request_provider(_) ->
+    sam_provider_request_unknown.
