@@ -60,3 +60,52 @@
         <<"workspaceFolders">> => true
     }
 }
+
+
+% Example Server Capabilities from Erlang_LS
+
+#{
+    id => 0,
+    jsonrpc => <<"2.0">>,
+    result => #{
+        capabilities => #{
+            codeActionProvider => true,
+            codeLensProvider => #{
+                resolveProvider => false
+            },
+            completionProvider => #{
+                resolveProvider => false,
+                triggerCharacters => [<<":">>,<<"#">>,<<"?">>,<<".">>]
+            },
+            definitionProvider => true,
+            documentFormattingProvider => true,
+            documentHighlightProvider => true,
+            documentRangeFormattingProvider => false,
+            documentSymbolProvider => true,
+            executeCommandProvider => #{
+                commands => [
+                    <<"29647:replace-lines">>,
+                    <<"29647:server-info">>,
+                    <<"29647:ct-run-test">>,
+                    <<"29647:show-behaviour-usages">>
+                ]
+            },
+            foldingRangeProvider => true,
+            hoverProvider => true,
+            implementationProvider => true,
+            referencesProvider => true,
+            textDocumentSync => #{
+                change => 1,
+                openClose => true,
+                save => #{
+                    includeText => false
+                }
+            },
+            workspaceSymbolProvider => true
+        },
+        serverInfo => #{
+            name => <<"Erlang LS">>,
+            version => <<"0.4.1+build.1231.refcfc7fc0">>
+        }
+    }
+}

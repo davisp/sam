@@ -40,7 +40,9 @@ handle(#{<<"params">> := Params} = Msg) ->
             textDocumentSync => #{
                 openClose => true,
                 change => ?LSP_TEXT_DOCUMENT_SYNC_KIND_NONE,
-                save => true
+                save => #{
+                    includeText => false
+                }
             }
         }
     }).
