@@ -79,7 +79,7 @@ update(#btree{root = Root} = Bt, ToAddKVs, ToRemKeys) ->
     {ok, Bt#btree{root = NewRoot}}.
 
 lookup(_Bt, undefined, Keys) ->
-    {ok, [{Key, not_found} || Key <- Keys]};
+    [{Key, not_found} || Key <- Keys];
 lookup(Bt, {Loc, _Count, _Size}, Keys) ->
     {NodeType, Children} = get_node(Bt, Loc),
     case NodeType of
@@ -101,6 +101,9 @@ lookup_kp(Bt, [{Key, Node} | Rest], Keys) ->
 
 lookup_kv(_Bt, [], Keys) ->
     [{Key, not_found} || Key <- Keys];
+lookup_kv(_Bt, _RestKVs, []) ->
+    % Done looking for keys in this node
+    [];
 lookup_kv(Bt, [{Key, Val} | RestKVs], [Key | RestKeys]) ->
     % Found key
     [{Key, Val} | lookup_kv(Bt, RestKVs, RestKeys)];
@@ -168,7 +171,7 @@ update_node(Bt, Node, Actions) ->
         Children ->
             % No changes to this node
             {LastKey, _} = lists:last(Children),
-            {LastKey, Node};
+            {ok, [{LastKey, Node}]};
         _ when Node == undefined ->
             write_node(Bt, kv_node, NewChildren);
         _ ->
@@ -185,8 +188,13 @@ update_kp(Bt, [{_Key, Node}], Actions, Result) ->
     {ok, lists:reverse(Result, NewKPs)};
 update_kp(Bt, [{Key, Node} | RestChildren], Actions, Result) ->
     {ActionsInNode, RestActions} = lists:splitwith(fun({_, K, _}) -> K =< Key end, Actions),
-    {ok, NewKPs} = update_node(Bt, Node, ActionsInNode),
-    NewResult = lists:reverse(NewKPs, Result),
+    NewResult = case ActionsInNode of
+        [] ->
+            [{Key, Node} | Result];
+        _ ->
+            {ok, NewKPs} = update_node(Bt, Node, ActionsInNode),
+            lists:reverse(NewKPs, Result)
+    end,
     update_kp(Bt, RestChildren, RestActions, NewResult).
 
 update_kv(_Bt, [], Actions, Result) ->
@@ -194,6 +202,9 @@ update_kv(_Bt, [], Actions, Result) ->
     % adding any insertions and ignoring deletions
     NewKVs = [{K, V} || {insert, K, V} <- Actions],
     {ok, lists:reverse(Result, NewKVs)};
+update_kv(_Bt, Rest, [], Result) ->
+    % No more actions to process
+    {ok, lists:reverse(Result, Rest)};
 update_kv(Bt, [{Key1, _} = KV | RestKVs], [{AType, Key2, Val} = Action | RestActions], Result) ->
     if
         Key1 < Key2 ->
@@ -242,7 +253,6 @@ get_node(#btree{fd = Fd}, Loc) ->
     {NodeType, NodeList}.
 
 write_node(#btree{fd = Fd}, NodeType, NodeList) ->
-    io:format(standard_error, "WRITING NODE: ~p~n", [NodeList]),
     {ok, lists:map(fun(Children) ->
         {LastKey, _} = lists:last(Children),
         {ok, Loc} = sam_db_file:append_term(Fd, {NodeType, Children}),
@@ -250,28 +260,53 @@ write_node(#btree{fd = Fd}, NodeType, NodeList) ->
         {LastKey, {Loc, Count, Size}}
     end, chunkify(NodeList))}.
 
-write_node(Bt, NodeType, Children, OldNode, OldChildren) when length(OldChildren) > 1 ->
-    % If OldChildren is a prefix of Children and
-    % is less than ?FILL_RATIO of our ?CHUNK_SIZE
-    % we re-use it rather than rewrite all the KVs.
-    % This helps reduce the amout of garbage generated,
-    % especially during in-order inserts.
-    case lists:prefix(OldChildren, Children) of
+write_node(Bt, NodeType, Children, OldNode, OldChildren) ->
+    % If OldChildren exists somewhere within Children we
+    % can re-use the old node if it contains more than ?FILL_RATIO
+    % of ?CHUNK_SIZE.
+    case erlang:external_size(OldChildren) > ?FILL_RATIO * ?CHUNK_SIZE of
         true ->
-            case erlang:external_size(OldChildren) < ?FILL_RATIO * ?CHUNK_SIZE of
-                true ->
-                    ToWrite = lists:nthtail(length(OldChildren), Children),
-                    KPs = write_node(Bt, NodeType, ToWrite),
-                    {ok, [OldNode | KPs]};
-                false ->
+            case find_old_children(Children, OldChildren) of
+                {Prefix, Suffix} ->
+                    {ok, PrefixKPs} = if Prefix == [] -> {ok, []}; true ->
+                        write_node(Bt, NodeType, Prefix)
+                    end,
+                    {ok, SuffixKPs} = if Suffix == [] -> {ok, []}; true ->
+                        write_node(Bt, NodeType, Suffix)
+                    end,
+                    {ok, PrefixKPs ++ [OldNode] ++ SuffixKPs};
+                not_found ->
                     write_node(Bt, NodeType, Children)
             end;
         false ->
             write_node(Bt, NodeType, Children)
-    end;
-write_node(Bt, NodeType, Children, _OldNode, _OldChildren) ->
-    write_node(Bt, NodeType, Children).
+    end.
 
+find_old_children(NewChildren, OldChildren) ->
+    {Prefix, RestNew} = remove_child_prefix(NewChildren, hd(OldChildren)),
+    case remove_old_children(RestNew, OldChildren) of
+        {ok, Suffix} ->
+            {Prefix, Suffix};
+        not_found ->
+            not_found
+    end.
+
+remove_child_prefix([Child | Rest], Old) when Child < Old ->
+    {Prefix, Tail} = remove_child_prefix(Rest, Old),
+    {[Child | Prefix], Tail};
+remove_child_prefix(Tail, _) ->
+    {[], Tail}.
+
+remove_old_children([], []) ->
+    {ok, []};
+remove_old_children(New, []) ->
+    {ok, New};
+remove_old_children([], _Old) ->
+    not_found;
+remove_old_children([KP | RestNew], [KP | RestOld]) ->
+    remove_old_children(RestNew, RestOld);
+remove_old_children(_, _) ->
+    not_found.
 
 %%%%%%%%%%%%% The chunkify function *still* sucks! %%%%%%%%%%%%%
 % It is inaccurate as it does not account for compression when blocks are

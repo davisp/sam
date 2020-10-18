@@ -34,7 +34,14 @@ sam_db_btree_test_() ->
                 ?TDEF_FE(can_add_row_to_btree),
                 ?TDEF_FE(can_lookup_row_in_btree),
                 ?TDEF_FE(can_add_multiple_rows),
-                ?TDEF_FE(can_add_multiple_rows_progressively)
+                ?TDEF_FE(can_add_multiple_rows_progressively),
+                ?TDEF_FE(can_add_multiple_rows_progressively_in_reverse),
+                ?TDEF_FE(can_add_multiple_rows_randomly),
+                ?TDEF_FE(can_remove_row),
+                ?TDEF_FE(can_remove_all_rows),
+                ?TDEF_FE(can_lookup_rows),
+                ?TDEF_FE(cant_lookup_rows_in_empty_tree),
+                ?TDEF_FE(start_keys_work)
             ]
         }
     }.
@@ -104,3 +111,108 @@ can_add_multiple_rows_progressively({Pid, _}) ->
     ?assertEqual(?NUM_ROWS, length(Result)),
     ?assert(sam_db_btree:size(NewBt) > 0),
     ?assertEqual(lists:sort(Result), lists:reverse(Result)).
+
+can_add_multiple_rows_progressively_in_reverse({Pid, _}) ->
+    {ok, Bt} = sam_db_btree:open(Pid),
+    KVs = [{I, rand:uniform()} || I <- lists:seq(1, ?NUM_ROWS)],
+    NewBt = lists:foldl(fun(KV, Acc) ->
+        {ok, NewAcc} = sam_db_btree:update(Acc, [KV], []),
+        NewAcc
+    end, Bt, lists:reverse(KVs)),
+    ?assertEqual(?NUM_ROWS, sam_db_btree:num_rows(NewBt)),
+    FoldFun = fun(K, V, Acc) -> [{K, V} | Acc] end,
+    Result = sam_db_btree:fold(NewBt, FoldFun, [], #{}),
+    ?assertEqual(?NUM_ROWS, length(Result)),
+    ?assert(sam_db_btree:size(NewBt) > 0),
+    ?assertEqual(lists:sort(Result), lists:reverse(Result)).
+
+can_add_multiple_rows_randomly({Pid, _}) ->
+    {ok, Bt} = sam_db_btree:open(Pid),
+    KVs = [{I, rand:uniform()} || I <- lists:seq(1, ?NUM_ROWS)],
+    NewBt = lists:foldl(fun(KV, Acc) ->
+        {ok, NewAcc} = sam_db_btree:update(Acc, [KV], []),
+        NewAcc
+    end, Bt, shuffle(KVs)),
+    ?assertEqual(?NUM_ROWS, sam_db_btree:num_rows(NewBt)),
+    FoldFun = fun(K, V, Acc) -> [{K, V} | Acc] end,
+    Result = sam_db_btree:fold(NewBt, FoldFun, [], #{}),
+    ?assertEqual(?NUM_ROWS, length(Result)),
+    ?assert(sam_db_btree:size(NewBt) > 0),
+    ?assertEqual(lists:sort(Result), lists:reverse(Result)).
+
+can_remove_row({Pid, _}) ->
+    {ok, Bt} = sam_db_btree:open(Pid),
+    FoldFun = fun(K, V, Acc) -> [{K, V} | Acc] end,
+
+    {ok, NewBt1} = sam_db_btree:update(Bt, [{a, b}], []),
+    Result1 = sam_db_btree:fold(NewBt1, FoldFun, [], #{}),
+    ?assertEqual([{a, b}], Result1),
+
+    {ok, NewBt2} = sam_db_btree:update(Bt, [], [a]),
+    Result2 = sam_db_btree:fold(NewBt2, FoldFun, [], #{}),
+    ?assertEqual([], Result2).
+
+can_remove_all_rows({Pid, _}) ->
+    {ok, Bt} = sam_db_btree:open(Pid),
+    
+    FoldFun = fun(K, V, Acc) -> [{K, V} | Acc] end,
+    KVs = [{I, rand:uniform()} || I <- lists:seq(1, ?NUM_ROWS)],
+
+    {ok, NewBt1} = sam_db_btree:update(Bt, KVs, []),
+    Result1 = sam_db_btree:fold(NewBt1, FoldFun, [], #{}),
+    ?assertEqual(lists:sort(Result1), lists:reverse(Result1)),
+
+    {ok, NewBt2} = sam_db_btree:update(Bt, [], element(1, lists:unzip(KVs))),
+    Result2 = sam_db_btree:fold(NewBt2, FoldFun, [], #{}),
+    ?assertEqual([], Result2).
+
+can_lookup_rows({Pid, _}) ->
+    {ok, Bt} = sam_db_btree:open(Pid),
+    KVs = [{I, rand:uniform()} || I <- lists:seq(1, ?NUM_ROWS)],
+    NewBt = lists:foldl(fun(KV, Acc) ->
+        {ok, NewAcc} = sam_db_btree:update(Acc, [KV], []),
+        NewAcc
+    end, Bt, shuffle(KVs)),
+    ?assertEqual(?NUM_ROWS, sam_db_btree:num_rows(NewBt)),
+
+    lists:foreach(fun({K, V}) ->
+        ?assertEqual([{K, V}], sam_db_btree:lookup(NewBt, [K]))
+    end, shuffle(KVs)),
+
+    {_, Chunks} = lists:foldl(fun(_, {From, To}) ->
+        {Chunk, Rest} = lists:split(length(KVs) div 4, From),
+        {Rest, [Chunk | To]}
+    end, {shuffle(KVs), []}, lists:seq(1, 4)),
+
+    lists:foreach(fun(Chunk) ->
+        Keys = [K || {K, _} <- Chunk],
+        Result = sam_db_btree:lookup(NewBt, Keys),
+        ?assertEqual(lists:sort(Chunk), Result)
+    end, Chunks).
+
+cant_lookup_rows_in_empty_tree({Pid, _}) ->
+    {ok, Bt} = sam_db_btree:open(Pid),
+    lists:foreach(fun(K) ->
+        ?assertEqual([{K, not_found}], sam_db_btree:lookup(Bt, [K]))
+    end, lists:seq(1, ?NUM_ROWS)).
+
+start_keys_work({Pid, _}) ->
+    {ok, Bt} = sam_db_btree:open(Pid),
+    FoldFun = fun(K, V, Acc) -> [{K, V} | Acc] end,
+    KVs = [{I, rand:uniform()} || I <- lists:seq(1, ?NUM_ROWS)],
+    NewBt = lists:foldl(fun(KV, Acc) ->
+        {ok, NewAcc} = sam_db_btree:update(Acc, [KV], []),
+        NewAcc
+    end, Bt, shuffle(KVs)),
+    ?assertEqual(?NUM_ROWS, sam_db_btree:num_rows(NewBt)),
+
+    lists:foreach(fun({K, V}) ->
+        Result = sam_db_btree:fold(NewBt, FoldFun, [], #{start_key => K}),
+        Reversed = lists:reverse(Result),
+        ?assertEqual(lists:sort(Result), Reversed),
+        ?assertEqual({K, V}, hd(Reversed))
+    end, shuffle(KVs)).
+
+shuffle(Items) ->
+    Tagged = [{rand:uniform(), I} || I <- Items],
+    [I || {_, I} <- lists:sort(Tagged)].
