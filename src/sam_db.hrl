@@ -10,7 +10,7 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--typoe position() :: #{
+-type position() :: #{
     line := number(),
     character := number()
 }.
@@ -19,6 +19,32 @@
     start := position(),
     'end' := position()
 }.
+
+-type poi_type() ::
+    module |
+    export |
+    exported_fun |
+    import |
+    imported_fun |
+    include |
+    include_lib |
+    record |
+    type |
+    export_type |
+    exported_type |
+    spec |
+    callback |
+    attribute |
+    function |
+    remote_call |
+    local_call |
+    remote_fun |
+    local_fun |
+    record_index |
+    record_field |
+    record_access |
+    %variable |
+    macro.
 
 -type poi() :: #{
     id := term(),
@@ -29,7 +55,6 @@
 
 -type doc() :: #{
     uri := binary(),
-    module := atom(),
     text := binary(),
     md5 := binary(),
     pois := [pois()]

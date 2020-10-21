@@ -83,6 +83,12 @@ notification_provider(<<"exit">>) ->
     sam_provider_notify_exit;
 notification_provider(<<"initialized">>) ->
     sam_provider_notify_initialized;
+notification_provider(<<"textDocument/didClose">>) ->
+    sam_provider_notify_did_close;
+notification_provider(<<"textDocument/didOpen">>) ->
+    sam_provider_notify_did_open;
+notification_provider(<<"textDocument/didSave">>) ->
+    sam_provider_notify_did_save;
 notification_provider(_) ->
     sam_provider_notify_unknown.
 
@@ -90,5 +96,11 @@ request_provider(<<"initialize">>) ->
     sam_provider_request_initialize;
 request_provider(<<"shutdown">>) ->
     sam_provider_request_shutdown;
+request_provider(<<"textDocument/definition">>) ->
+    sam_provider_request_definition;
+request_provider(<<"textDocument/references">>) ->
+    sam_provider_request_references;
+request_provider(<<"textDocument/documentSymbols">>) ->
+    sam_provider_request_symbols;
 request_provider(_) ->
     sam_provider_request_unknown.

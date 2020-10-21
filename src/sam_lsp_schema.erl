@@ -116,8 +116,8 @@
     implementation_request/0,
     implementation_response/0,
 
-    reference_request/0,
-    reference_response/0,
+    references_request/0,
+    references_response/0,
 
     document_highlight_request/0,
     document_highlight_response/0,
@@ -224,7 +224,7 @@ client_initiated() ->
         definition_request,
         type_definition_request,
         implementation_request,
-        reference_request,
+        references_request,
         document_highlight_request,
         document_symbol_request,
         code_action_request,
@@ -286,7 +286,7 @@ server_initiated() ->
         definition_response,
         type_definition_response,
         implementation_response,
-        reference_response,
+        references_response,
         document_highlight_response,
         document_symbol_response,
         code_action_response,
@@ -358,8 +358,8 @@ response_type(type_definition_request) ->
     type_definition_response;
 response_type(implementation_request) ->
     implementation_response;
-response_type(reference_request) ->
-    reference_response;
+response_type(references_request) ->
+    references_response;
 response_type(document_highlight_request) ->
     document_highlight_response;
 response_type(document_symbol_request) ->
@@ -736,7 +736,7 @@ text_document_client_capabilities() ->
         definition => opt(definition_client_capabilities()),
         typeDefinition => opt(type_definition_client_capabilities()),
         implementation => opt(implementation_client_capabilities()),
-        references => opt(reference_client_capabilities()),
+        references => opt(references_client_capabilities()),
         documentHighlight => opt(document_highlight_client_capabilities()),
         documentSymbol => opt(document_symbol_client_capabilities()),
         codeAction => opt(code_action_client_capabilities()),
@@ -806,7 +806,7 @@ server_capabilities() ->
         definitionProvider => opt([boolean, definition_options()]),
         typeDefinitionProvider => opt([boolean, type_definition_options()]),
         implementationProvider => opt([boolean, implementation_options()]),
-        referencesProvider => opt([boolean, reference_options()]),
+        referencesProvider => opt([boolean, references_options()]),
         documentHighlightProvider => opt([boolean, document_highlight_options()]),
         documentSymbolProvider => opt([boolean, document_symbol_options()]),
         codeActionProvider => opt([boolean, code_action_options()]),
@@ -965,7 +965,7 @@ registration() ->
             definition_registration_options(),
             type_definition_registration_options(),
             implementation_registration_options(),
-            reference_registration_options(),
+            references_registration_options(),
             document_highlight_registration_options(),
             document_symbol_registration_options(),
             code_action_registration_options(),
@@ -1691,7 +1691,7 @@ definition_params() ->
 definition_response() ->
     Base = response_message(),
     Base#{
-        result => [location(), array(location()), array(location_link())]
+        result => [location(), array(location()), array(location_link()), null]
     }.
 
 type_definition_client_capabilities() ->
@@ -1762,41 +1762,41 @@ implementation_response() ->
         result => [location(), array(location()), array(location_link())]
     }.
 
-reference_client_capabilities() ->
+references_client_capabilities() ->
     #{
         dynamicRegistration => opt(boolean)
     }.
 
-reference_options() ->
+references_options() ->
     work_done_progress_options().
 
-reference_registration_options() ->
+references_registration_options() ->
     Base1 = text_document_registration_options(),
-    Base2 = reference_options(),
+    Base2 = references_options(),
     maps:merge(Base1, Base2).
 
-reference_request() ->
+references_request() ->
     Base = request_message(),
     Base#{
-        method => <<"textDocument/referenes">>,
-        params => reference_params()
+        method => <<"textDocument/references">>,
+        params => references_params()
     }.
 
-reference_params() ->
+references_params() ->
     Base1 = text_document_position_params(),
     Base2 = work_done_progress_params(),
     Base3 = partial_result_params(),
     Base = maps:merge(Base1, maps:merge(Base2, Base3)),
     Base#{
-        context => reference_context()
+        context => references_context()
     }.
 
-reference_context() ->
+references_context() ->
     #{
         includeDeclaration => boolean
     }.
 
-reference_response() ->
+references_response() ->
     Base = response_message(),
     Base#{
         result => [array(location()), null]

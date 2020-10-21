@@ -13,7 +13,8 @@
 -module(sam).
 
 -export([
-    main/1
+    main/1,
+    configure_lager/0
 ]).
 
 -export([
@@ -30,7 +31,6 @@ main(Opts) ->
 
     % Allow for cleanly shutting down
     application:set_env(sam, root_pid, self()),
-    lager:debug("ENV: ~p", [application:get_all_env(sam)]),
     receive
         {exit, Code} -> erlang:halt(Code);
         Else -> erlang:error({bad_shutdown, Else})
@@ -38,7 +38,8 @@ main(Opts) ->
 
 
 exit(Code) ->
-    lager:debug("EXIT: ~p", [application:get_all_env(sam)]),
+    Stack = process_info(self(), current_stacktrace),
+    lager:debug("Attempting to exit from: ~p", [Stack]),
     {ok, RootPid} = application:get_env(sam, root_pid),
     RootPid ! {exit, Code}.
 
@@ -56,7 +57,7 @@ parse_opts(Opts) ->
 
 
 options() ->
-    DefaultLogDir = filename:basedir(user_log, "erlang-sam"),
+    DefaultLogDir = filename:basedir(user_log, "sam"),
     DefaultLogLevel = "debug",
     [
         {log_dir, $d, "log-dir", {string, DefaultLogDir},

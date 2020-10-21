@@ -40,7 +40,8 @@ init(Config) ->
     application:set_env(sam, init_opts, InitOpts),
     application:set_env(sam, capabilities, Capabilities),
     application:set_env(sam, trace, Trace),
-    application:set_env(sam, workspace_folders, WorkspaceFolders).
+    application:set_env(sam, workspace_folders, WorkspaceFolders),
+    sam_db:set_uri(RootUri).
 
 initialized() ->
     application:set_env(sam, initialized, true).
@@ -71,6 +72,7 @@ workspace_folders() ->
 spawn_parent_monitor(null) ->
     ok;
 spawn_parent_monitor(Pid) when is_integer(Pid) ->
+    lager:error("Parent pid? ~p", [Pid]),
     Cmd = lists:flatten(io_lib:format("kill -0 ~b", [Pid])),
     spawn(fun() -> parent_monitor_loop(Cmd) end).
 

@@ -298,7 +298,7 @@ find_header(St, CurrHeaderOffset) ->
 find_header(_St, CurrHeaderOffset, _UUID) when CurrHeaderOffset < 0 ->
     no_valid_header;
 find_header(St, CurrHeaderOffset, UUID) ->
-    FirstOffset = max(0, CurrHeaderOffset - ?HEADER_SCAN_COUNT + 1),
+    FirstOffset = max(1, CurrHeaderOffset - ?HEADER_SCAN_COUNT + 1),
     Offsets = [?HEADER_OFFSET * B || B <- lists:seq(FirstOffset, CurrHeaderOffset)],
     PreadLocs = [{Offset, ?HEADER_PREFIX_LEN} || Offset <- Offsets],
     
@@ -349,4 +349,4 @@ to_binary(Term) ->
     term_to_binary(Term, [compressed, {minor_version, 1}]).
 
 to_term(Bin) ->
-    binary_to_term(Bin, [safe]).
+    binary_to_term(Bin).
