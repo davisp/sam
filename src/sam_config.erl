@@ -40,8 +40,7 @@ init(Config) ->
     application:set_env(sam, init_opts, InitOpts),
     application:set_env(sam, capabilities, Capabilities),
     application:set_env(sam, trace, Trace),
-    application:set_env(sam, workspace_folders, WorkspaceFolders),
-    sam_db:set_uri(RootUri).
+    application:set_env(sam, workspace_folders, WorkspaceFolders).
 
 initialized() ->
     application:set_env(sam, initialized, true).

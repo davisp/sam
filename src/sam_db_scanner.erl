@@ -14,8 +14,8 @@
 -behaviour(gen_server).
 
 -export([
-    start_link/1,
-    close/1
+    start_link/0,
+    scan/1
 ]).
 
 -export([
@@ -28,12 +28,12 @@
 ]).
 
 -export([
-    scan/1
+    do_scan/1
 ]).
 
 -record(st, {
-    root_uri,
-    pid
+    queue,
+    scanner
 }).
 
 -define(INDEX_EXTENSIONS, [
@@ -43,47 +43,68 @@
     <<".escript">>
 ]).
 
-start_link(RootUri) ->
-    gen_server:start_link({local, ?MODULE}, ?MODULE, RootUri, []).
+start_link() ->
+    gen_server:start_link({local, ?MODULE}, ?MODULE, [], []).
 
-close(Pid) ->
-    gen_server:call(Pid, close, infinity).
+scan(Uri) ->
+    gen_server:cast(?MODULE, {scan, Uri}).
 
-init(RootUri) ->
-    {ok, #st{
-        root_uri = RootUri,
-        pid = erlang:spawn(?MODULE, scan, [RootUri])
-    }}.
+init(_) ->
+    OTPUri = sam_uri:from_path(code:root_dir()),
+    InitQ = queue:from_list([OTPUri]),
+    St = start_scan(#st{queue = InitQ}),
+    {ok, St}.
 
-terminate(_Reason, #st{pid = Worker}) when is_pid(Worker) ->
-    exit(Worker, kill);
-terminate(_Reason, _St) ->
+terminate(_Reason, St) ->
+    case is_pid(St#st.scanner) of
+        true -> exit(St#st.scanner, kill);
+        false -> ok
+    end,
     ok.
 
-handle_call(close, _From, St) ->
-    {stop, normal, ok, St};
 handle_call(Msg, _From, St) ->
     {stop, {bad_call, Msg}, {bad_call, Msg}, St}.
 
+handle_cast({scan, Uri}, St) ->
+    NewSt = St#st{
+        queue = queue:in(Uri, St#st.queue)
+    },
+    {noreply, start_scan(NewSt)};
 handle_cast(Msg, St) ->
     {stop, {bad_cast, Msg}, St}.
 
+handle_info({'DOWN', _, _, Pid, Reason}, #st{scanner = Pid} = St) ->
+    if Reason == normal -> ok; true ->
+        lager:error("Scan failed: ~p", [Reason])
+    end,
+    {noreply, start_scan(St)};
 handle_info(Msg, St) ->
     {stop, {bad_info, Msg}, St}.
 
 code_change(_OldVsn, St, _Extra) ->
     {ok, St}.
 
-scan(RootUri) ->
-    Uris = [
-        sam_uri:from_path(code:root_dir()),
-        RootUri
-    ],
-    lists:foreach(fun(Uri) ->
-        Path = sam_uri:to_path(Uri),
-        lager:info("Scanning: ~s", [Path]),
-        scan_dir(Path, list_dir(Path))
-    end, Uris).
+do_scan(Uri) ->
+    Path = sam_uri:to_path(Uri),
+    lager:info("Scanning: ~s", [Path]),
+    scan_dir(Path, list_dir(Path)).        
+
+start_scan(St) ->
+    #st{
+        queue = Queue,
+        scanner = Scanner
+    } = St,
+    case queue:is_empty(Queue) of
+        false when Scanner == undefined ->
+            {{value, Uri}, NewQ} = queue:out(Queue),
+            {Pid, _Ref} = erlang:spawn_monitor(?MODULE, do_scan, [Uri]),
+            St#st{
+                queue = NewQ,
+                scanner = Pid
+            };
+        _ ->
+            St
+    end.
 
 scan_dir(Dir, Files) ->
     lists:foreach(fun(File) ->

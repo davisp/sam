@@ -113,23 +113,14 @@ add_to_index(Uri) ->
     case file:read_file(Path) of
         {ok, Contents} ->
             Md5 = crypto:hash(md5, Contents),
-            IndexedMd5 = try
-                sam_db:md5_for_uri(Uri)
-            catch T:R:S ->
-                lager:error("Failed to read md5 for ~s :: ~p~n~p", [Uri, {T, R}, S]),
-                <<>>
-            end,
-            case Md5 == IndexedMd5 of
+            case Md5 == sam_db:get_md5(Uri) of
                 true ->
                     % Already indexed
                     ok;
                 false ->
-                    lager:debug("~s : ~p /= ~p", [Uri, Md5, IndexedMd5]),
-                    % Not indexed or changed since last index
                     POIs = sam_parser:parse(Uri, Contents),
                     sam_db:add_doc(#{
                         uri => Uri,
-                        text => Contents,
                         md5 => crypto:hash(md5, Contents),
                         pois => POIs
                     }),
