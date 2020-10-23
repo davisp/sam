@@ -37,8 +37,8 @@ handle(#{<<"params">> := Params} = Msg) ->
     } = Params,
     Uri = sam_uri:normalize(RawUri),
     POIs = case sam_db:get_doc(Uri) of
-        {ok, #{pois := Ps}} -> Ps;
-        _ -> []
+        #{pois := Ps} -> Ps;
+        not_found -> []
     end,
 
     SortedPOIs = lists:sort(fun(A, B) ->

@@ -25,7 +25,6 @@ normalize(Uri) ->
         <<"/Volumes/Macintosh HD", Rest/binary>> ->
             from_path(Rest);
         _E ->
-            lager:info("Whut?: ~p", [_E]),
             Uri
     end.
 

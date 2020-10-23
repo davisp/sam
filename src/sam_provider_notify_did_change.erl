@@ -10,7 +10,7 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(sam_provider_notify_did_open).
+-module(sam_provider_notify_did_change).
 
 -export([
     handle/1
@@ -18,23 +18,27 @@
 
 %#{
 %    <<"jsonrpc">> => <<"2.0">>,
-%    <<"method">> => <<"textDocument/didOpen">>,
+%    <<"method">> => <<"textDocument/didChange">>,
 %    <<"params">> => #{
+%        <<"contentChanges">> => [
+%            #{
+%                <<"text">> => <<"% Licensed under the Apache License, Version 2.0 ...">>
+%            }
+%        ],
 %        <<"textDocument">> => #{
-%            <<"languageId">> => <<"erlang">>,
-%            <<"text">> => <<"% Licensed under the Apache License, Version 2.0 (the \"License\"); ...">>,
-%            <<"uri">> => <<"file:///Volumes/Macintosh%20HD/Users/davisp/github/davisp/sam/src/sam_provider_notify_did_save.erl">>,
-%            <<"version">> => 1
+%            <<"uri">> => <<"file:///Volumes/Macintosh%20HD/Users/davisp/github/davisp/sam/src/sam_provider_notify_did_close.erl">>,
+%            <<"version">> => 203
 %        }
 %    }
 %}
 
 handle(#{<<"params">> := Params}) ->
     #{
+        <<"contentChanges">> := Changes,
         <<"textDocument">> := #{
-            <<"uri">> := RawUri,
-            <<"text">> := Text
+            <<"uri">> := RawUri
         }
     } = Params,
     Uri = sam_uri:normalize(RawUri),
-    sam_file_server:opened(Uri, Text).
+    [NewText | _] = lists:reverse([T || #{<<"text">> := T} <- Changes]),
+    sam_file_server:changed(Uri, NewText).

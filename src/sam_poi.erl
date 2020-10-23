@@ -14,12 +14,12 @@
 
 -export([
     search/3,
+    search/4,
     match/2,
     extract/2,
     overlaps/3,
     range_to_tuple/1
 ]).
-
 
 search(Pattern, Fields, POIs) ->
     lists:flatmap(fun(POI) ->
@@ -28,6 +28,19 @@ search(Pattern, Fields, POIs) ->
             false -> []
         end
     end, POIs).
+
+search(Pattern, Fields, {Line, Char}, POIs) ->
+    Sorted = lists:sort(lists:map(fun(POI) ->
+        #{range := #{
+            start := #{line := SLine, character := SChar},
+            'end' := #{line := ELine, character := EChar}
+        }} = POI,
+        CLine = ELine - SLine,
+        CChar = EChar - SChar,
+        {CLine - Line, CChar - Char, ELine - SLine, EChar - SChar, POI}
+    end, POIs)),
+    SortedPOIs = lists:map(fun(Item) -> element(5, Item) end, Sorted),
+    search(Pattern, Fields, SortedPOIs).
 
 match(Pattern, POI) when is_map(Pattern), is_map(POI) ->
     lists:all(fun({K, V}) ->
@@ -57,11 +70,13 @@ extract(Fields, POI) when is_list(Fields), is_map(POI) ->
         maps:put(Field, maps:get(Field, POI), Acc)
     end, #{}, Fields).
 
-overlaps(POI, Line, Char) ->
-    #{range := #{
+overlaps(#{range := Range}, Line, Char) ->
+    overlaps(Range, Line, Char);
+overlaps(Range, Line, Char) ->
+    #{
         start := #{line := SLine, character := SChar},
         'end' := #{line := ELine, character := EChar}
-    }} = POI,
+    } = Range,
     AfterStart = SLine =< Line andalso SChar =< Char,
     BeforeEnd = ELine >= Line andalso EChar >= Char,
     AfterStart andalso BeforeEnd.

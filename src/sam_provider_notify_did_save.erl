@@ -16,7 +16,6 @@
     handle/1
 ]).
 
-
 handle(#{<<"params">> := Params}) ->
     #{
         <<"textDocument">> := #{
@@ -24,5 +23,5 @@ handle(#{<<"params">> := Params}) ->
         }
     } = Params,
     Uri = sam_uri:normalize(RawUri),
-    other:call(foo),
-    sam_db_indexer:index(Uri).
+    sam_db_indexer:index(Uri),
+    sam_diagnostics:diagnose(Uri).

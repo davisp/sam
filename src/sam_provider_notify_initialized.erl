@@ -19,4 +19,4 @@
 
 handle(#{}) ->
     sam_config:initialized(),
-    sam_db_scanner:scan(sam_config:root_uri()).
+    sam_db:set_uri(sam_config:root_uri()).

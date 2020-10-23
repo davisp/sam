@@ -52,7 +52,7 @@ do_notify(TypeName, Msg) ->
         Provider = notification_provider(maps:get(<<"method">>, Msg)),
         Provider:handle(Msg)
     catch T2:R2:S2 ->
-        lager:error("Error handling notification: ~p :: ~p ~p", [Msg, {T2, R2}, S2])
+        lager:error("Error handling notification: ~p ~p", [{T2, R2}, S2])
     end.
     
 
@@ -68,7 +68,7 @@ do_request(ReqTypeName, RespTypeName, Msg) ->
         Provider = request_provider(maps:get(<<"method">>, Msg)),
         Provider:handle(Msg)
     catch T2:R2:S2 ->
-        lager:error("Error handling message: ~p :: ~p ~p", [Msg, {T2, R2}, S2]),
+        lager:error("Error handling message: ~p ~p", [{T2, R2}, S2]),
         sam_client:error(Msg, ?JSONRPC_INTERNAL_ERROR, unknown_error),
         exit(normal)
     end,
@@ -83,6 +83,8 @@ notification_provider(<<"exit">>) ->
     sam_provider_notify_exit;
 notification_provider(<<"initialized">>) ->
     sam_provider_notify_initialized;
+notification_provider(<<"textDocument/didChange">>) ->
+    sam_provider_notify_did_change;
 notification_provider(<<"textDocument/didClose">>) ->
     sam_provider_notify_did_close;
 notification_provider(<<"textDocument/didOpen">>) ->
@@ -98,8 +100,12 @@ request_provider(<<"shutdown">>) ->
     sam_provider_request_shutdown;
 request_provider(<<"textDocument/definition">>) ->
     sam_provider_request_definition;
+request_provider(<<"textDocument/hover">>) ->
+    sam_provider_request_hover;
 request_provider(<<"textDocument/references">>) ->
     sam_provider_request_references;
+request_provider(<<"textDocument/signatureHelp">>) ->
+    sam_provider_request_signature;
 request_provider(<<"textDocument/documentSymbols">>) ->
     sam_provider_request_symbols;
 request_provider(_) ->

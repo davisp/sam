@@ -581,7 +581,7 @@ workspace_edit() ->
 workspace_edit_client_capabilities() ->
     #{
         documentChanges => opt(boolean),
-        resourceOperations => opt(resource_operation_kind()),
+        resourceOperations => opt(array(resource_operation_kind())),
         failureHandling => opt(failure_handling_kind())
     }.
 
@@ -1275,7 +1275,10 @@ text_document_content_change_event() ->
     CompleteChange = #{
         text => string
     },
-    [RangeChange, CompleteChange].
+    % Nova is sending empty objects for textual
+    % changes for some reason.
+    NovaWeirdness = #{},
+    [RangeChange, CompleteChange, NovaWeirdness].
 
 will_save_text_document_notification() ->
     Base = notification_message(),
@@ -1539,7 +1542,7 @@ hover_params() ->
 hover_response() ->
     Base = response_message(),
     Base#{
-        result => hover_result()
+        result => [hover_result(), null]
     }.
 
 hover_result() ->

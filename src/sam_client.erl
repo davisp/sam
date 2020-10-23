@@ -52,6 +52,7 @@ send(TypeName, Msg) ->
             sam_lsp_validator:validate(sam_lsp_schema:TypeName(), Msg),
             gen_server:cast(?MODULE, {send, Msg});
         RespType ->
+            lager:info("RESP TYPE: ~p~n", [RespType]),
             case lists:member(TypeName, sam_lsp_schema:server_initiated()) of
                 true ->
                     ok;

@@ -35,9 +35,11 @@ init([]) ->
     Children = [
         #{id => sam_client, start => {sam_client, start_link, []}},
         #{id => sam_server, start => {sam_server, start_link, []}},
+        #{id => sam_file_server, start => {sam_file_server, start_link, []}},
         #{id => sam_db_indexer, start => {sam_db_indexer, start_link, []}},
         #{id => sam_db, start => {sam_db, start_link, []}},
         #{id => sam_db_scanner, start => {sam_db_scanner, start_link, []}},
+        #{id => sam_diagnostics, start => {sam_diagnostics, start_link, []}},
         #{id => sam_stdio, start => {sam_stdio, start_link, []}}
     ],
     {ok, {Flags, Children}}.

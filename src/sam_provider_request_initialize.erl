@@ -39,10 +39,18 @@ handle(#{<<"params">> := Params} = Msg) ->
         capabilities => #{
             textDocumentSync => #{
                 openClose => true,
-                change => ?LSP_TEXT_DOCUMENT_SYNC_KIND_NONE,
+                change => ?LSP_TEXT_DOCUMENT_SYNC_KIND_FULL,
                 save => #{
                     includeText => false
                 }
+            },
+            definitionProvider => true,
+            hoverProvider => true,
+            %completionProvider => #{
+            %    triggerChars => [<<":">>, <<"(">>]
+            %},
+            signatureHelpProvider => #{
+                triggerCharacters => [<<"(">>]
             }
         }
     }).

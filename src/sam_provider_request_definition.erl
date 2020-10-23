@@ -40,51 +40,43 @@ handle(#{<<"params">> := Params} = Msg) ->
     } = Params,
     Uri = sam_uri:normalize(RawUri),
     Resp = case sam_db:get_doc(Uri) of
-        {ok, #{pois := POIs}} ->
-            POIsAt = lists:filter(fun(POI) -> sam_poi:overlaps(POI, Line, Char) end, POIs),
-            Calls = lists:filter(fun(POI) ->
-                case POI of
-                    #{type := remote_call} -> true;
-                    #{type := local_call} -> true;
-                    _ -> false
-                end
-            end, POIsAt),
-            case Calls of
-                [#{type := remote_call, data := {Mod, Fun, Arity}} | _] ->
-                    case sam_db:uri_for_mod(Mod) of
-                        {ok, RemoteUri} ->
-                            lookup_location(RemoteUri, Fun, Arity);
+        #{pois := POIs} ->
+            CallQuery = #{
+                type => [remote_call, local_call],
+                range => fun(Range) -> sam_poi:overlaps(Range, Line, Char) end
+            },
+            case sam_poi:search(CallQuery, [data], {Line, Char}, POIs) of
+                [#{data := {M, F, A}} | _] ->
+                    case sam_db:get_doc_for_mod(M) of
+                        #{uri := RemoteUri, pois := RemotePOIs} ->
+                            FunQuery = #{
+                                type => function,
+                                data => fun(Data) -> Data == {F, A} end
+                            },
+                            case sam_poi:search(FunQuery, [range], RemotePOIs) of
+                                [#{range := Range} | _] ->
+                                    #{uri => RemoteUri, range => Range};
+                                _ ->
+                                    null
+                            end;
+                        not_found ->
+                            null
+                    end;
+                [#{data := {F, A}} | _] ->
+                    FunQuery = #{
+                        type => function,
+                        data => fun(Data) -> Data == {F, A} end
+                    },
+                    case sam_poi:search(FunQuery, [range], POIs) of
+                        [#{range := Range} | _] ->
+                            #{uri => Uri, range => Range};
                         _ ->
                             null
                     end;
-                [#{type := local_call, data := {Fun, Arity}} | _] ->
-                    lookup_location(Uri, POIs, Fun, Arity);
                 _ ->
                     null
             end;
-        _Else ->
+        not_found ->
             null
     end,
     sam_provider:response(Msg, Resp).
-
-lookup_location(Uri, Fun, Arity) ->
-    case sam_db:get_doc(Uri) of
-        {ok, #{pois := POIs}} ->
-            lookup_location(Uri, POIs, Fun, Arity);
-        _ ->
-            null
-    end.
-
-lookup_location(Uri, POIs, Fun, Arity) ->
-    Functions = lists:filter(fun(POI) ->
-        case POI of
-            #{type := function, data := {Fun, Arity}} -> true;
-            _ -> false
-        end
-    end, POIs),
-    case Functions of
-        [#{range := Range} | _] ->
-            #{uri => Uri, range => Range};
-        _ ->
-            null
-    end.

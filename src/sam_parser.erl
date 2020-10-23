@@ -29,7 +29,8 @@ parse(Uri, Source) ->
                 end
             end, FormsAndTokens));
         error ->
-            lager:warning("Failed to parse: ~s", [Uri])
+            lager:warning("Failed to parse: ~s", [Uri]),
+            []
     end.
 
 process({attribute, Anno, module, {ModName, _Args}}, Tokens) ->
@@ -210,7 +211,7 @@ process_tree({call, CloseParen, {remote, _, ModExpr, FunExpr}, Args}) ->
             [#{
                 type => remote_call,
                 data => {hd(Mod), hd(Fun), length(Args)},
-                range => annos_to_range(element(2, ModExpr), CloseParen)
+                range => annos_to_range(element(2, ModExpr), move_anno(CloseParen, 0, 1))
             }];
         false ->
             []
@@ -224,7 +225,7 @@ process_tree({call, CloseParen, {atom, Start, Fun}, Args}) ->
     CallPOI = [#{
         type => Type,
         data => FunDef,
-        range => annos_to_range(Start, CloseParen)
+        range => annos_to_range(Start, move_anno(CloseParen, 0, 1))
     }],
     CallPOI ++ lists:map(fun process_tree/1, Args);
 process_tree({'fun', Anno, {function, M, F, A}}) ->
@@ -302,6 +303,10 @@ process_tree({macro, Anno, Macro}) ->
         data => Macro,
         range => anno_to_range(Anno, 0, atom_len(Macro))
     };
+process_tree({clauses, Clauses}) ->
+    process_tree(Clauses);
+process_tree(List) when is_list(List) ->
+    lists:map(fun process_tree/1, List);
 process_tree(Node) when is_tuple(Node), size(Node) > 2 ->
     [_NodeType, _Anno | Elems] = tuple_to_list(Node),
     lists:map(fun
@@ -315,14 +320,7 @@ process_tree(_Else) ->
 
 tokens_to_range(Tokens) ->
     Start = element(2, hd(Tokens)),
-    End = case find_dot(Tokens) of
-        {dot, Anno} ->
-            % Include the `.` in highlights
-            {ELine, ECol} = lc(Anno),
-            {dot, [{line, ELine}, {column, ECol + 1}]};
-        Else ->
-            Else
-    end,
+    End = find_dot(Tokens),
     annos_to_range(Start, End).
 
 annos_to_range(Start, End) ->
@@ -360,10 +358,11 @@ anno_ex_to_range(Anno) ->
             annos_to_range(Anno, Anno)
     end.
 
+find_dot([{dot, Anno} | _]) ->
+    {L, C} = lc(Anno),
+    [{line, L}, {column, C + 1}];
 find_dot([Last]) ->
     element(2, Last);
-find_dot([{dot, Anno} | _]) ->
-    Anno;
 find_dot([_ | Rest]) ->
     find_dot(Rest).
 

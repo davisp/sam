@@ -50,10 +50,9 @@ scan(Uri) ->
     gen_server:cast(?MODULE, {scan, Uri}).
 
 init(_) ->
-    OTPUri = sam_uri:from_path(code:root_dir()),
-    InitQ = queue:from_list([OTPUri]),
-    St = start_scan(#st{queue = InitQ}),
-    {ok, St}.
+    {ok, #st{
+        queue = queue:new()
+    }}.
 
 terminate(_Reason, St) ->
     case is_pid(St#st.scanner) of
@@ -77,7 +76,7 @@ handle_info({'DOWN', _, _, Pid, Reason}, #st{scanner = Pid} = St) ->
     if Reason == normal -> ok; true ->
         lager:error("Scan failed: ~p", [Reason])
     end,
-    {noreply, start_scan(St)};
+    {noreply, start_scan(St#st{scanner = undefined})};
 handle_info(Msg, St) ->
     {stop, {bad_info, Msg}, St}.
 
@@ -87,7 +86,7 @@ code_change(_OldVsn, St, _Extra) ->
 do_scan(Uri) ->
     Path = sam_uri:to_path(Uri),
     lager:info("Scanning: ~s", [Path]),
-    scan_dir(Path, list_dir(Path)).        
+    scan_dir(Path, list_dir(Path)).
 
 start_scan(St) ->
     #st{

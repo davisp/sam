@@ -55,7 +55,6 @@
 
 -type doc() :: #{
     uri := binary(),
-    text := binary(),
     md5 := binary(),
     pois := [pois()]
 }.

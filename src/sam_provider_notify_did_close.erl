@@ -16,6 +16,21 @@
     handle/1
 ]).
 
+%#{
+%    <<"jsonrpc">> => <<"2.0">>,
+%    <<"method">> => <<"textDocument/didClose">>,
+%    <<"params">> => #{
+%        <<"textDocument">> => #{
+%            <<"uri">> => <<"file:///Volumes/Macintosh%20HD/Users/davisp/github/davisp/sam/src/sam_provider_notify_did_save.erl">>
+%        }
+%    }
+%}
 
-handle(#{}) ->
-    ok.
+handle(#{<<"params">> := Params}) ->
+    #{
+        <<"textDocument">> := #{
+            <<"uri">> := RawUri
+        }
+    } = Params,
+    Uri = sam_uri:normalize(RawUri),
+    sam_file_server:closed(Uri).
