@@ -100,6 +100,8 @@ request_provider(<<"shutdown">>) ->
     sam_provider_request_shutdown;
 request_provider(<<"textDocument/definition">>) ->
     sam_provider_request_definition;
+request_provider(<<"textDocument/formatting">>) ->
+    sam_provider_request_formatting;
 request_provider(<<"textDocument/hover">>) ->
     sam_provider_request_hover;
 request_provider(<<"textDocument/references">>) ->

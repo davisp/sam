@@ -2235,7 +2235,7 @@ formatting_options() ->
         timTrailingWhitespace => opt(boolean),
         insertFinalNewLine => opt(boolean),
         trimFinalNewLines => opt(boolean),
-        '_' => [boolean, number, string]
+        '_' => opt([boolean, number, string])
     }.
 
 document_formatting_response() ->
