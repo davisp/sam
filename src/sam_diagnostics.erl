@@ -139,7 +139,6 @@ compile_opts(Uri) ->
         _ ->
             []
     end,
-    lager:info("Include opts: ~p", [IncludeOpts]),
     BaseOpts ++ IncludeOpts.
 
 process_include(Uri, #{type := include, data := FileName}) ->
@@ -173,7 +172,6 @@ process_include(_Uri, #{type := behavior, data := Module}) ->
             Src = filename:dirname(Path),
             App = filename:dirname(Src),
             EBin = filename:join(App, "ebin"),
-            lager:info("Adding code path: ~s", [EBin]),
             code:add_path(binary_to_list(EBin)),
             [];
         _ ->
